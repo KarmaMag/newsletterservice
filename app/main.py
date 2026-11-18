@@ -548,7 +548,7 @@ def track_event(campaign_id: str, event_type: str, payload: EmailIn):
 
 @app.get("/unsubscribe")
 def unsubscribe_page(email: str):
-    return FileResponse("/workspace/newsletter-agent/static/unsubscribe.html")
+    return FileResponse(os.path.join(_static_dir, "unsubscribe.html"))
 
 
 @app.get("/open/{campaign_id}/{email}")
@@ -572,7 +572,7 @@ def open_pixel(campaign_id: str, email: str, v: Optional[str] = None):
     )
 
 
-_static_dir = os.path.join(os.path.dirname(__file__), "..", "static")
+_static_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "static"))
 app.mount("/static", StaticFiles(directory=_static_dir), name="static")
 
 
