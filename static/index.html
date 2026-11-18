@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Newsletter Agent</title>
+<style>
+  :root { --bg:#f6f7fb; --card:#fff; --border:#e3e6ef; --text:#1c2333; --muted:#68718a; --accent:#4f46e5; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:var(--bg); color:var(--text); }
+  header { background:var(--card); border-bottom:1px solid var(--border); padding:12px 22px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  header h1 { font-size:17px; margin:0; }
+  header .logo { width:28px; height:28px; border-radius:8px; background:var(--accent); color:#fff; display:grid; place-items:center; font-weight:700; }
+  nav { display:flex; gap:4px; flex-wrap:wrap; }
+  nav button { border:none; background:none; padding:6px 11px; border-radius:8px; cursor:pointer; font-size:13px; color:var(--muted); }
+  nav button.active { background:#eef0ff; color:var(--accent); font-weight:600; }
+  main { max-width:1100px; margin:22px auto; padding:0 18px; }
+  .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-bottom:20px; }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:14px; }
+  .card .value { font-size:24px; font-weight:700; }
+  .card .label { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+  table { width:100%; border-collapse:collapse; background:var(--card); border:1px solid var(--border); border-radius:12px; overflow:hidden; }
+  th, td { text-align:left; padding:8px 12px; border-bottom:1px solid var(--border); font-size:13px; vertical-align:top; }
+  th { background:#fafbfe; color:var(--muted); font-size:11px; text-transform:uppercase; }
+  tr:last-child td { border-bottom:none; }
+  .badge { padding:2px 9px; border-radius:99px; font-size:11px; font-weight:600; }
+  .badge.subscribed, .badge.active, .badge.published, .badge.sent, .badge.paid, .badge.booked, .badge.running { background:#e5f8ee; color:#0f8a4d; }
+  .badge.unsubscribed, .badge.canceled, .badge.blocked { background:#fdeaea; color:#c23b3b; }
+  .badge.pending, .badge.draft, .badge.available, .badge.sold, .badge.done { background:#fff6e0; color:#a87a00; }
+  .badge.cleaned, .badge.transactional, .badge.paused, .badge.completed, .badge.stopped { background:#eef0f5; color:#68718a; }
+  .btn { border:1px solid var(--border); background:var(--card); padding:5px 11px; border-radius:8px; cursor:pointer; font-size:12px; }
+  .btn.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .btn.danger { color:#c23b3b; }
+  .panel { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:16px; margin-bottom:16px; }
+  .panel h3 { margin:0 0 10px; font-size:14px; }
+  label { display:block; font-size:12px; color:var(--muted); margin:8px 0 3px; }
+  input, textarea, select { width:100%; padding:7px 10px; border:1px solid var(--border); border-radius:8px; font-size:13px; font-family:inherit; }
+  textarea { min-height:90px; font-family:ui-monospace,monospace; }
+  .row { display:flex; gap:10px; } .row > * { flex:1; }
+  #toast { position:fixed; bottom:18px; right:18px; background:var(--text); color:#fff; padding:9px 15px; border-radius:10px; font-size:13px; opacity:0; transition:opacity .2s; pointer-events:none; max-width:60%; }
+  .hidden { display:none; }
+  .toolbar { display:flex; gap:10px; margin-bottom:12px; flex-wrap:wrap; }
+  .toolbar input { flex:1; min-width:160px; }
+  .muted { color:var(--muted); font-size:12px; }
+  a { color:var(--accent); }
+  code { background:#eef0f5; padding:1px 6px; border-radius:6px; font-size:12px; }
+  #chat-log { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:14px; height:420px; overflow-y:auto; margin-bottom:10px; }
+  #chat-log .msg { margin-bottom:12px; font-size:13px; white-space:pre-wrap; }
+  #chat-log .msg .who { font-size:10px; text-transform:uppercase; color:var(--muted); letter-spacing:.05em; }
+  pre.json { background:#fafbfe; border:1px solid var(--border); border-radius:8px; padding:10px; font-size:12px; overflow:auto; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">N</div><h1>Newsletter Agent</h1>
+  <nav id="tabs">
+    <button data-tab="dashboard" class="active">Dashboard</button>
+    <button data-tab="contacts">Contacts</button>
+    <button data-tab="campaigns">Campaigns</button>
+    <button data-tab="templates">Templates</button>
+    <button data-tab="automations">Automations</button>
+    <button data-tab="segments">Segments</button>
+    <button data-tab="publish">Publish</button>
+    <button data-tab="commerce">Commerce</button>
+    <button data-tab="bookings">Bookings</button>
+    <button data-tab="grow">Grow</button>
+    <button data-tab="analytics">Analytics</button>
+    <button data-tab="integrations">Integrations</button>
+    <button data-tab="import">Mailchimp</button>
+    <button data-tab="chat">AI Chat</button>
+  </nav>
+</header>
+<main>
+
+  <section id="tab-dashboard">
+    <div class="cards" id="stat-cards"></div>
+    <div class="panel"><h3>Audiences</h3><table id="audience-table"></table></div>
+    <div class="panel"><h3>Public site</h3>
+      <p class="muted">
+        <a href="/blog" target="_blank">/blog</a> ·
+        <a href="/shop" target="_blank">/shop</a> ·
+        <a href="/plans" target="_blank">/plans</a> ·
+        <a href="/book" target="_blank">/book</a> ·
+        landing pages: <a href="/p/..." target="_blank">/p/&#123;slug&#125;</a>
+      </p></div>
+  </section>
+
+  <section id="tab-contacts" class="hidden">
+    <div class="toolbar">
+      <input id="contact-search" placeholder="Search email, name, tag...">
+      <button class="btn" onclick="loadContacts()">Search</button>
+      <button class="btn primary" onclick="showAddContact()">+ Add contact</button>
+    </div>
+    <table id="contact-table"></table>
+  </section>
+
+  <section id="tab-campaigns" class="hidden">
+    <div class="toolbar"><button class="btn primary" onclick="showNewCampaign()">+ New campaign</button>
+      <button class="btn" onclick="showNewAbTest()">+ A/B test</button></div>
+    <table id="campaign-table"></table>
+  </section>
+
+  <section id="tab-templates" class="hidden">
+    <div class="panel">
+      <h3>New template</h3>
+      <div class="row"><input id="tpl-name" placeholder="Template name"><input id="tpl-subject" placeholder="Subject line"></div>
+      <textarea id="tpl-html" placeholder="HTML body"></textarea>
+      <div style="margin-top:8px"><button class="btn primary" onclick="createTemplate()">Save template</button></div>
+    </div>
+    <table id="template-table"></table>
+  </section>
+
+  <section id="tab-automations" class="hidden">
+    <div class="panel">
+      <h3>New sequence</h3>
+      <div class="row">
+        <input id="seq-name" placeholder="Name (e.g. Welcome series)">
+        <select id="seq-trigger">
+          <option value="signup">Trigger: new signup (welcome)</option>
+          <option value="tag_added">Trigger: tag added</option>
+          <option value="purchased">Trigger: purchase</option>
+          <option value="manual">Manual enroll</option>
+        </select>
+        <input id="seq-value" placeholder="Trigger value (e.g. tag name)">
+        <button class="btn primary" onclick="createSequence()">Create</button>
+      </div>
+      <div style="margin-top:10px"><button class="btn" onclick="tickAutomations()">▶ Process due steps now</button></div>
+    </div>
+    <div id="sequence-list"></div>
+    <div class="panel"><h3>Enrollments</h3><table id="enrollment-table"></table></div>
+  </section>
+
+  <section id="tab-segments" class="hidden">
+    <div class="panel">
+      <h3>New segment (rules are ANDed)</h3>
+      <input id="seg-name" placeholder="Segment name">
+      <textarea id="seg-rules" placeholder='[{"field":"tag","op":"any","value":"vip"},{"field":"event","op":"has","value":"purchase"}]'></textarea>
+      <div style="margin-top:8px"><button class="btn primary" onclick="createSegment()">Create segment</button></div>
+      <p class="muted">Rule fields: tag(any/not_any), event(has), status/email(eq/neq/contains), signup_source(eq/contains), campaign(opened/clicked), sequence(enrolled).</p>
+    </div>
+    <table id="segment-table"></table>
+  </section>
+
+  <section id="tab-publish" class="hidden">
+    <div class="panel">
+      <h3>New post (blog / newsletter archive)</h3>
+      <div class="row"><input id="post-title" placeholder="Title"><input id="post-subtitle" placeholder="Subtitle"></div>
+      <textarea id="post-html" placeholder="HTML body"></textarea>
+      <div class="row" style="margin-top:8px">
+        <select id="post-visibility"><option value="public">Public</option><option value="paid">Paid only</option></select>
+        <button class="btn primary" onclick="createPost()">Create &amp; publish</button>
+      </div>
+    </div>
+    <table id="post-table"></table>
+    <div class="panel" style="margin-top:16px">
+      <h3>New landing page</h3>
+      <div class="row"><input id="page-title" placeholder="Title"><input id="page-slug" placeholder="slug (optional)"></div>
+      <textarea id="page-html" placeholder="HTML content (a subscribe form is added automatically)"></textarea>
+      <div style="margin-top:8px"><button class="btn primary" onclick="createPage()">Publish page → /p/&#123;slug&#125;</button></div>
+    </div>
+    <table id="page-table"></table>
+  </section>
+
+  <section id="tab-commerce" class="hidden">
+    <div class="row">
+      <div class="panel">
+        <h3>New product</h3>
+        <input id="prod-name" placeholder="Name">
+        <div class="row"><input id="prod-price" type="number" placeholder="Price (cents)"><select id="prod-type"><option>download</option><option>course</option><option>coaching</option></select></div>
+        <input id="prod-desc" placeholder="Description">
+        <input id="prod-url" placeholder="Download URL">
+        <div style="margin-top:8px"><button class="btn primary" onclick="createProduct()">Create product</button></div>
+      </div>
+      <div class="panel">
+        <h3>New paid plan</h3>
+        <input id="plan-name" placeholder="Plan name">
+        <div class="row"><input id="plan-price" type="number" placeholder="Price (cents)"><select id="plan-interval"><option>monthly</option><option>yearly</option></select></div>
+        <input id="plan-desc" placeholder="Perks / description">
+        <div style="margin-top:8px"><button class="btn primary" onclick="createPlan()">Create plan</button></div>
+      </div>
+    </div>
+    <div class="cards" id="revenue-cards"></div>
+    <h3 style="font-size:13px;color:var(--muted)">PRODUCTS</h3>
+    <table id="product-table"></table>
+    <h3 style="font-size:13px;color:var(--muted)">ORDERS</h3>
+    <table id="order-table"></table>
+    <h3 style="font-size:13px;color:var(--muted)">SUBSCRIPTIONS</h3>
+    <table id="subscription-table"></table>
+  </section>
+
+  <section id="tab-bookings" class="hidden">
+    <div class="panel">
+      <h3>New bookable service</h3>
+      <input id="svc-name" placeholder="Service name">
+      <div class="row"><input id="svc-duration" type="number" placeholder="Duration (min)"><input id="svc-price" type="number" placeholder="Price (cents)"></div>
+      <input id="svc-desc" placeholder="Description">
+      <input id="svc-avail" placeholder='Availability JSON: {"Mon":["09:00-12:00"],"Wed":["14:00-17:00"]}'>
+      <div style="margin-top:8px"><button class="btn primary" onclick="createService()">Create service</button></div>
+    </div>
+    <table id="service-table"></table>
+    <h3 style="font-size:13px;color:var(--muted)">BOOKINGS</h3>
+    <table id="booking-table"></table>
+  </section>
+
+  <section id="tab-grow" class="hidden">
+    <div class="cards" id="grow-cards"></div>
+    <div class="panel">
+      <h3>Creator Network — recommend partner newsletters</h3>
+      <div class="row"><input id="reco-name" placeholder="Partner name"><input id="reco-url" placeholder="Partner URL"></div>
+      <input id="reco-desc" placeholder="One-line pitch">
+      <div style="margin-top:8px">
+        <button class="btn primary" onclick="addRecommendation()">Add partner</button>
+        <button class="btn" onclick="copyEmbed()">Get embed snippet</button>
+      </div>
+    </div>
+    <table id="reco-table"></table>
+    <div class="panel" style="margin-top:14px">
+      <h3>Sponsorship slots</h3>
+      <div class="row"><input id="sp-name" placeholder="Sponsor name"><input id="sp-price" type="number" placeholder="Price (cents)"><input id="sp-copy" placeholder="Ad copy"><button class="btn primary" onclick="createSponsorship()">Add slot</button></div>
+    </div>
+    <table id="sponsorship-table"></table>
+    <h3 style="font-size:13px;color:var(--muted)">REFERRAL LEADERBOARD</h3>
+    <table id="referral-table"></table>
+  </section>
+
+  <section id="tab-analytics" class="hidden">
+    <div class="cards" id="analytics-cards"></div>
+    <div class="panel"><h3>Funnel</h3><table id="funnel-table"></table></div>
+    <div class="panel"><h3>Top campaigns</h3><table id="top-campaigns"></table></div>
+    <div class="panel"><h3>Top signup sources</h3><table id="source-table"></table></div>
+    <div class="panel"><h3>Creator revenue</h3><pre class="json" id="creator-json">click "Refresh analytics"</pre>
+      <button class="btn" onclick="loadCreator()">Refresh creator metrics</button></div>
+  </section>
+
+  <section id="tab-integrations" class="hidden">
+    <div class="panel">
+      <h3>Outbound webhooks</h3>
+      <div class="row"><input id="wh-name" placeholder="Name"><input id="wh-url" placeholder="https://hooks.example.com/..."></div>
+      <input id="wh-events" placeholder="Events (comma separated, empty = all)">
+      <div style="margin-top:8px"><button class="btn primary" onclick="createWebhook()">Add webhook</button></div>
+    </div>
+    <table id="webhook-table"></table>
+    <div class="panel" style="margin-top:14px"><h3>Directory</h3><pre class="json" id="integration-dir">loading...</pre></div>
+  </section>
+
+  <section id="tab-import" class="hidden">
+    <div class="panel">
+      <h3>Import from Mailchimp</h3>
+      <p class="muted">Pull all audiences, contacts, tags and campaign content from your existing
+      Mailchimp account. Get an API key in Mailchimp: <b>Account → Profile → Extras → API keys</b>.</p>
+      <label>Mailchimp API key</label>
+      <input id="mc-key" type="password" placeholder="xxxxxxxx-us21">
+      <label><input id="mc-activity" type="checkbox" style="width:auto"> Also import open/click history (slower)</label>
+      <div style="margin-top:12px"><button class="btn primary" onclick="runImport()">Import now</button></div>
+      <pre id="import-result" class="json hidden" style="margin-top:14px"></pre>
+    </div>
+  </section>
+
+  <section id="tab-chat" class="hidden">
+    <div id="chat-log"></div>
+    <div class="toolbar">
+      <input id="chat-input" placeholder="Ask about your data or strategy — e.g. how is my open rate trending?"
+             onkeydown="if(event.key==='Enter')sendChat()">
+      <button class="btn primary" onclick="sendChat()">Send</button>
+    </div>
+    <p class="muted">With <code>MISTRAL_API_KEY</code> set on the server, questions are answered by a full
+    tool-using agent that reads your live analytics. Without a key you get a data snapshot + strategy prompts.</p>
+  </section>
+</main>
+<div id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const toast = msg => { const t = $('#toast'); t.textContent = msg; t.style.opacity = 1; setTimeout(() => t.style.opacity = 0, 2800); };
+async function api(path, opts = {}) {
+  const resp = await fetch(path, { headers: { 'Content-Type': 'application/json' }, ...opts });
+  const data = await resp.json().catch(() => null);
+  if (!resp.ok) throw new Error((data && (data.detail?.message || data.detail)) || resp.statusText);
+  return data;
+}
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money = c => '$' + ((c || 0) / 100).toFixed(2);
+
+document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('#tabs button').forEach(x => x.classList.remove('active'));
+  b.classList.add('active');
+  document.querySelectorAll('main section').forEach(s => s.classList.add('hidden'));
+  $('#tab-' + b.dataset.tab).classList.remove('hidden');
+  const loaders = { dashboard: loadDashboard, contacts: loadContacts, campaigns: loadCampaigns,
+    templates: loadTemplates, automations: loadAutomations, segments: loadSegments,
+    publish: () => { loadPosts(); loadPages(); }, commerce: () => { loadProducts(); loadOrders(); loadSubs(); },
+    bookings: () => { loadServices(); loadBookings(); }, grow: loadGrow,
+    analytics: loadAnalytics, integrations: loadIntegrations, chat: () => {} };
+  (loaders[b.dataset.tab] || loadDashboard)();
+});
+
+/* ---------- dashboard ---------- */
+async function loadDashboard() {
+  const s = await api('/api/stats');
+  $('#stat-cards').innerHTML = [
+    ['Contacts', s.contacts], ['Subscribed', s.subscribed], ['Campaigns', s.campaigns],
+    ['Sent', s.campaigns_sent], ['Opens', s.opens], ['Clicks', s.clicks],
+    ['Product revenue', money(s.product_revenue_cents)], ['Active subs', s.active_subscriptions]]
+    .map(([l, v]) => `<div class="card"><div class="value">${v}</div><div class="label">${l}</div></div>`).join('');
+  const audiences = await api('/api/audiences');
+  $('#audience-table').innerHTML = '<tr><th>Name</th><th>Contacts</th><th>Source</th></tr>' +
+    (audiences.map(a => `<tr><td>${esc(a.name)}</td><td>${a.contact_count}</td><td>${a.mailchimp_list_id ? 'Mailchimp' : 'local'}</td></tr>`).join('')
+    || '<tr><td colspan="3" class="muted">No audiences yet.</td></tr>');
+}
+
+/* ---------- contacts ---------- */
+async function loadContacts() {
+  const q = encodeURIComponent($('#contact-search').value || '');
+  const data = await api(`/api/contacts?search=${q}&limit=100`);
+  $('#contact-table').innerHTML = '<tr><th>Email</th><th>Name</th><th>Status</th><th>Tags</th><th></th></tr>' +
+    (data.contacts.map(c => `<tr><td>${esc(c.email)}</td><td>${esc([c.first_name, c.last_name].filter(Boolean).join(' '))}</td>
+      <td><span class="badge ${esc(c.status)}">${esc(c.status)}</span></td>
+      <td class="muted">${esc((c.tags || []).join(', '))}</td>
+      <td>${c.status === 'subscribed' ? `<button class="btn danger" onclick="unsub('${c.id}')">Unsub</button>` : ''}</td></tr>`).join('')
+    || '<tr><td colspan="5" class="muted">No contacts.</td></tr>');
+}
+function unsub(id) { api(`/api/contacts/${id}`, { method: 'PATCH', body: JSON.stringify({ status: 'unsubscribed' }) }).then(loadContacts).catch(e => toast(e.message)); }
+function showAddContact() {
+  const email = prompt('Email address:'); if (!email) return;
+  api('/api/audiences').then(async audiences => {
+    let audience = audiences[0];
+    if (!audience) audience = await api('/api/audiences', { method: 'POST', body: JSON.stringify({ name: 'Main list' }) });
+    return api('/api/contacts', { method: 'POST', body: JSON.stringify({ email, audience_id: audience.id }) });
+  }).then(loadContacts).catch(e => toast(e.message));
+}
+
+/* ---------- campaigns + AB ---------- */
+async function loadCampaigns() {
+  const rows = await api('/api/campaigns');
+  $('#campaign-table').innerHTML = '<tr><th>Name</th><th>Subject</th><th>Status</th><th></th></tr>' +
+    (rows.map(c => `<tr><td>${esc(c.name)}</td><td>${esc(c.subject)}</td>
+      <td><span class="badge ${esc(c.status)}">${esc(c.status)}</span></td><td>
+      ${c.status === 'draft' ? `<button class="btn primary" onclick="sendCampaign('${c.id}')">Send</button>` : ''}
+      <button class="btn" onclick="campaignStats('${c.id}')">Stats</button></td></tr>`).join('')
+    || '<tr><td colspan="4" class="muted">No campaigns yet.</td></tr>');
+}
+async function sendCampaign(id) {
+  const check = await api(`/api/campaigns/${id}/send?dry_run=true`);
+  if (!check.recipients) { toast('No recipients'); return; }
+  if (!confirm(`Send to ${check.recipients} recipients?`)) return;
+  const r = await api(`/api/campaigns/${id}/send`);
+  toast(`${r.status}: ${r.recipients} recipients` + (r.ab_groups ? ` · A/B groups ${JSON.stringify(r.ab_groups)}` : ` · failures ${r.failures.length}`));
+  loadCampaigns();
+}
+async function campaignStats(id) {
+  const s = await api(`/api/campaigns/${id}/stats`);
+  toast(`Sent ${s.sent} · opens ${s.opens} (${(s.open_rate * 100).toFixed(1)}%) · clicks ${s.clicks} (${(s.click_rate * 100).toFixed(1)}%)`);
+}
+async function showNewCampaign() {
+  const name = prompt('Campaign name:'); if (!name) return;
+  const subject = prompt('Subject line:'); if (!subject) return;
+  const html = prompt('HTML content:'); if (html === null) return;
+  const audiences = await api('/api/audiences');
+  if (!audiences.length) { toast('Create an audience first'); return; }
+  await api('/api/campaigns', { method: 'POST',
+    body: JSON.stringify({ audience_id: audiences[0].id, name, subject, html_content: html }) });
+  toast('Campaign drafted'); loadCampaigns();
+}
+async function showNewAbTest() {
+  const campaigns = (await api('/api/campaigns')).filter(c => c.status === 'draft');
+  if (!campaigns.length) { toast('Draft a campaign first'); return; }
+  const cid = campaigns[0].id;
+  const subjA = prompt('Variant A subject:'); if (!subjA) return;
+  const subjB = prompt('Variant B subject:'); if (!subjB) return;
+  const test = await api(`/api/campaigns/${cid}/ab-tests`, { method: 'POST',
+    body: JSON.stringify({ name: 'Subject test', variants: [
+      { label: 'A', subject: subjA }, { label: 'B', subject: subjB } ] }) });
+  const check = await api(`/api/ab-tests/${test.id}/send`, { method: 'POST', body: '{}' });
+  toast(`A/B test created. Split: ${JSON.stringify(check.groups)}. Send the campaign to deliver.`);
+}
+
+/* ---------- templates ---------- */
+async function loadTemplates() {
+  const rows = await api('/api/templates');
+  $('#template-table').innerHTML = '<tr><th>Name</th><th>Subject</th><th></th></tr>' +
+    (rows.map(t => `<tr><td>${esc(t.name)}</td><td>${esc(t.subject)}</td>
+      <td><button class="btn danger" onclick="delItem('/api/templates/${t.id}')">Delete</button></td></tr>`).join('')
+    || '<tr><td colspan="3" class="muted">No templates yet.</td></tr>');
+}
+async function createTemplate() {
+  try {
+    await api('/api/templates', { method: 'POST', body: JSON.stringify({
+      name: $('#tpl-name').value, subject: $('#tpl-subject').value, html_content: $('#tpl-html').value }) });
+    toast('Template saved'); loadTemplates();
+  } catch (e) { toast(e.message); }
+}
+async function delItem(url) { await api(url, { method: 'DELETE' }); toast('Deleted'); }
+
+/* ---------- automations ---------- */
+async function loadAutomations() {
+  const seqs = await api('/api/automations/sequences');
+  $('#sequence-list').innerHTML = seqs.map(s => `
+    <div class="panel"><h3>${esc(s.name)}
+      <span class="badge ${esc(s.status)}">${esc(s.status)}</span></h3>
+      <p class="muted">trigger: ${esc(s.trigger_type)}${s.trigger_value ? ` = ${esc(s.trigger_value)}` : ''} ·
+        ${s.enrollments} enrolled · ${s.completed} completed</p>
+      <table>${s.steps.map(st => `<tr><td>#${st.position + 1}</td><td>after ${st.delay_hours}h</td>
+        <td>${esc(st.subject)}</td></tr>`).join('') || '<tr><td class="muted">No steps yet — add via API or the AI chat</td></tr>'}</table>
+      <div style="margin-top:8px">
+        ${s.status !== 'active' ? `<button class="btn primary" onclick="activateSeq('${s.id}')">Activate</button>` : ''}
+        <button class="btn danger" onclick="delItem('/api/automations/sequences/${s.id}')">Delete</button>
+      </div></div>`).join('') || '<div class="panel muted">No sequences yet.</div>';
+  const enrollments = await api('/api/automations/enrollments');
+  $('#enrollment-table').innerHTML = '<tr><th>Contact</th><th>Sequence</th><th>Next step</th><th>Status</th></tr>' +
+    (enrollments.map(e => `<tr><td>${esc(e.email)}</td><td>${esc(e.sequence_name)}</td>
+      <td>#${e.next_step + 1}</td><td><span class="badge ${esc(e.status)}">${esc(e.status)}</span></td></tr>`).join('')
+    || '<tr><td colspan="4" class="muted">No enrollments yet.</td></tr>');
+}
+async function createSequence() {
+  try {
+    await api('/api/automations/sequences', { method: 'POST', body: JSON.stringify({
+      name: $('#seq-name').value || 'Sequence', trigger_type: $('#seq-trigger').value,
+      trigger_value: $('#seq-value').value || null }) });
+    toast('Sequence created — add steps and activate'); loadAutomations();
+  } catch (e) { toast(e.message); }
+}
+async function activateSeq(id) {
+  await api(`/api/automations/sequences/${id}`, { method: 'PATCH', body: JSON.stringify({ status: 'active' }) });
+  toast('Sequence active'); loadAutomations();
+}
+async function tickAutomations() {
+  const r = await api('/api/automations/tick', { method: 'POST', body: '{}' });
+  toast(`Processed: ${r.sends} sent, ${r.completed} completed`); loadAutomations();
+}
+
+/* ---------- segments ---------- */
+async function loadSegments() {
+  const rows = await api('/api/segments');
+  $('#segment-table').innerHTML = '<tr><th>Name</th><th>Contacts</th><th>Rules</th><th></th></tr>' +
+    (rows.map(s => `<tr><td>${esc(s.name)}</td><td>${s.contact_count}</td>
+      <td class="muted">${esc(JSON.stringify(s.rules))}</td>
+      <td><button class="btn" onclick="previewSegment('${s.id}')">Preview</button>
+      <button class="btn danger" onclick="delItem('/api/segments/${s.id}')">Delete</button></td></tr>`).join('')
+    || '<tr><td colspan="4" class="muted">No segments yet.</td></tr>');
+}
+async function createSegment() {
+  try {
+    await api('/api/segments', { method: 'POST', body: JSON.stringify({
+      name: $('#seg-name').value || 'Segment', rules: JSON.parse($('#seg-rules').value || '[]') }) });
+    toast('Segment created'); loadSegments();
+  } catch (e) { toast('Invalid rules JSON: ' + e.message); }
+}
+async function previewSegment(id) {
+  const r = await api(`/api/segments/${id}/preview`);
+  toast(`${r.total} matching contacts; first: ${r.contacts.slice(0, 3).map(c => c.email).join(', ') || '—'}`);
+}
+
+/* ---------- publish ---------- */
+async function loadPosts() {
+  const rows = await api('/api/posts');
+  $('#post-table').innerHTML = '<tr><th>Title</th><th>Status</th><th>Visibility</th><th>Link</th></tr>' +
+    (rows.map(p => `<tr><td>${esc(p.title)}</td><td><span class="badge ${esc(p.status)}">${esc(p.status)}</span></td>
+      <td>${esc(p.visibility)}</td>
+      <td><a href="/blog/${esc(p.slug)}" target="_blank">/blog/${esc(p.slug)}</a></td></tr>`).join('')
+    || '<tr><td colspan="4" class="muted">No posts yet.</td></tr>');
+}
+async function createPost() {
+  try {
+    const post = await api('/api/posts', { method: 'POST', body: JSON.stringify({
+      title: $('#post-title').value, subtitle: $('#post-subtitle').value,
+      html_content: $('#post-html').value, visibility: $('#post-visibility').value }) });
+    await api(`/api/posts/${post.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'published' }) });
+    toast('Published'); loadPosts();
+  } catch (e) { toast(e.message); }
+}
+async function loadPages() {
+  const rows = await api('/api/pages');
+  $('#page-table').innerHTML = '<tr><th>Title</th><th>Views</th><th>Signups</th><th>AB report</th><th>Link</th></tr>' +
+    (rows.map(p => `<tr><td>${esc(p.title)} <button class="btn" onclick="addVariant('${p.id}')">+ variant</button></td>
+      <td>${p.views}</td><td>${p.signups}</td>
+      <td><button class="btn" onclick="pageAb('${p.id}')">Report</button></td>
+      <td><a href="/p/${esc(p.slug)}" target="_blank">/p/${esc(p.slug)}</a></td></tr>`).join('')
+    || '<tr><td colspan="5" class="muted">No pages yet.</td></tr>');
+}
+async function createPage() {
+  try {
+    const audiences = await api('/api/audiences');
+    const page = await api('/api/pages', { method: 'POST', body: JSON.stringify({
+      title: $('#page-title').value, slug: $('#page-slug').value || undefined,
+      html_content: $('#page-html').value, audience_id: audiences[0]?.id, published: true }) });
+    toast('Live at /p/' + page.slug); loadPages();
+  } catch (e) { toast(e.message); }
+}
+async function addVariant(id) {
+  const label = prompt('Variant label (e.g. B):'); if (!label) return;
+  const html = prompt('Variant HTML content:'); if (html === null) return;
+  await api(`/api/pages/${id}/variants`, { method: 'POST', body: JSON.stringify({ label, html_content: html }) });
+  toast('Variant added — views/conversions now split by label');
+}
+async function pageAb(id) {
+  const r = await api(`/api/pages/${id}/ab-report`, { method: 'POST', body: '{}' });
+  toast(r.report.map(x => `${x.label}: ${x.views} views, ${(x.conversion_rate * 100).toFixed(1)}%`).join(' · ') +
+    (r.winner ? ` — winner: ${r.winner}` : ''));
+}
+
+/* ---------- commerce ---------- */
+async function loadProducts() {
+  const rows = await api('/api/products');
+  $('#product-table').innerHTML = '<tr><th>Name</th><th>Type</th><th>Price</th><th>Status</th></tr>' +
+    (rows.map(p => `<tr><td>${esc(p.name)}</td><td>${esc(p.product_type)}</td><td>${money(p.price_cents)}</td>
+      <td><span class="badge ${p.published ? 'published' : 'draft'}">${p.published ? 'live' : 'draft'}</span></td></tr>`).join('')
+    || '<tr><td colspan="4" class="muted">No products yet.</td></tr>');
+  const analytics = await api('/api/analytics/overview?days=90').catch(() => null);
+  if (analytics) {
+    const rev = analytics.revenue, f = analytics.funnel;
+    $('#revenue-cards').innerHTML = [
+      ['Product revenue', money(rev.product_revenue_cents)], ['Sponsorship revenue', money(rev.sponsorship_revenue_cents)],
+      ['Active subscriptions', rev.active_subscriptions], ['View→signup', (f.view_to_signup_rate * 100).toFixed(1) + '%'],
+      ['Signup→purchase', (f.signup_to_purchase_rate * 100).toFixed(1) + '%']]
+      .map(([l, v]) => `<div class="card"><div class="value">${v}</div><div class="label">${l}</div></div>`).join('');
+  }
+}
+async function createProduct() {
+  try {
+    await api('/api/products', { method: 'POST', body: JSON.stringify({
+      name: $('#prod-name').value, price_cents: +$('#prod-price').value || 0,
+      product_type: $('#prod-type').value, description: $('#prod-desc').value,
+      file_url: $('#prod-url').value || null, published: true }) });
+    toast('Product live in /shop — demo checkout records orders'); loadProducts();
+  } catch (e) { toast(e.message); }
+}
+async function loadOrders() {
+  const rows = await api('/api/orders');
+  $('#order-table').innerHTML = '<tr><th>Product</th><th>Email</th><th>Amount</th><th>Status</th></tr>' +
+    (rows.map(o => `<tr><td>${esc(o.product_name)}</td><td>${esc(o.email)}</td><td>${money(o.amount_cents)}</td>
+      <td><span class="badge ${esc(o.status)}">${esc(o.status)}</span></td></tr>`).join('')
+    || '<tr><td colspan="4" class="muted">No orders yet.</td></tr>');
+}
+async function loadSubs() {
+  const rows = await api('/api/subscriptions');
+  $('#subscription-table').innerHTML = '<tr><th>Email</th><th>Plan</th><th>Price</th><th>Status</th></tr>' +
+    (rows.map(s => `<tr><td>${esc(s.email)}</td><td>${esc(s.plan_name)}</td><td>${money(s.price_cents)}/${esc(s.interval)}</td>
+      <td><span class="badge ${esc(s.status)}">${esc(s.status)}</span></td></tr>`).join('')
+    || '<tr><td colspan="4" class="muted">No paid subscribers yet.</td></tr>');
+}
+async function createPlan() {
+  try {
+    await api('/api/subscription-plans', { method: 'POST', body: JSON.stringify({
+      name: $('#plan-name').value, price_cents: +$('#plan-price').value || 0,
+      interval: $('#plan-interval').value, description: $('#plan-desc').value, published: true }) });
+    toast('Plan live at /plans'); loadSubs();
+  } catch (e) { toast(e.message); }
+}
+
+/* ---------- bookings ---------- */
+async function loadServices() {
+  const rows = await api('/api/services');
+  $('#service-table').innerHTML = '<tr><th>Name</th><th>Duration</th><th>Price</th><th>Book</th></tr>' +
+    (rows.map(s => `<tr><td>${esc(s.name)}</td><td>${s.duration_min} min</td><td>${money(s.price_cents)}</td>
+      <td><a href="/book/${esc(s.id)}" target="_blank">/book/${esc(s.id).slice(0, 8)}…</a></td></tr>`).join('')
+    || '<tr><td colspan="4" class="muted">No services yet.</td></tr>');
+}
+async function createService() {
+  try {
+    await api('/api/services', { method: 'POST', body: JSON.stringify({
+      name: $('#svc-name').value, description: $('#svc-desc').value,
+      duration_min: +$('#svc-duration').value || 30, price_cents: +$('#svc-price').value || 0,
+      availability: $('#svc-avail').value, published: true }) });
+    toast('Service published at /book'); loadServices();
+  } catch (e) { toast(e.message); }
+}
+async function loadBookings() {
+  const rows = await api('/api/bookings');
+  $('#booking-table').innerHTML = '<tr><th>Service</th><th>When (UTC)</th><th>Email</th><th>Status</th></tr>' +
+    (rows.map(b => `<tr><td>${esc(b.service_name)}</td><td>${new Date(b.slot_ts * 1000).toISOString().slice(0, 16).replace('T', ' ')}</td>
+      <td>${esc(b.email)}</td><td><span class="badge ${esc(b.status)}">${esc(b.status)}</span></td></tr>`).join('')
+    || '<tr><td colspan="4" class="muted">No bookings yet.</td></tr>');
+}
+
+/* ---------- grow ---------- */
+async function loadGrow() {
+  const creator = await api('/api/analytics/creator');
+  $('#grow-cards').innerHTML = [
+    ['Subscribers', creator.subscribers], ['Referral signups', creator.referral_signups],
+    ['Creator network clicks', creator.creator_network_clicks], ['Est. MRR', money(creator.estimated_mrr_cents)]]
+    .map(([l, v]) => `<div class="card"><div class="value">${v}</div><div class="label">${l}</div></div>`).join('');
+  const recos = await api('/api/recommendations');
+  $('#reco-table').innerHTML = '<tr><th>Partner</th><th>Pitch</th><th>Clicks</th><th>Impressions</th><th></th></tr>' +
+    (recos.map(r => `<tr><td>${esc(r.partner_name)}</td><td class="muted">${esc(r.description)}</td>
+      <td>${r.clicks}</td><td>${r.impressions}</td>
+      <td><button class="btn danger" onclick="delItem('/api/recommendations/${r.id}')">Remove</button></td></tr>`).join('')
+    || '<tr><td colspan="5" class="muted">No partners yet.</td></tr>');
+  const sps = await api('/api/sponsorships');
+  $('#sponsorship-table').innerHTML = '<tr><th>Sponsor</th><th>Copy</th><th>Price</th><th>Status</th></tr>' +
+    (sps.map(s => `<tr><td>${esc(s.sponsor_name)}</td><td class="muted">${esc(s.ad_copy)}</td><td>${money(s.price_cents)}</td>
+      <td><span class="badge ${esc(s.status)}">${esc(s.status)}</span></td></tr>`).join('')
+    || '<tr><td colspan="4" class="muted">No slots yet.</td></tr>');
+  const board = await api('/api/referrals/leaderboard/top').catch(() => []);
+  $('#referral-table').innerHTML = '<tr><th>Referrer</th><th>Direct signups</th><th>Subscribed</th></tr>' +
+    (board.map(r => `<tr><td>${esc(r.email || r.referrer_contact_id)}</td><td>${r.directs}</td><td>${r.subscribed || 0}</td></tr>`).join('')
+    || '<tr><td colspan="3" class="muted">No referrals yet. Links: get from a contact via the agent or /api/referrals/{contact_id}.</td></tr>');
+}
+async function addRecommendation() {
+  try {
+    await api('/api/recommendations', { method: 'POST', body: JSON.stringify({
+      partner_name: $('#reco-name').value, partner_url: $('#reco-url').value,
+      description: $('#reco-desc').value }) });
+    toast('Partner added'); loadGrow();
+  } catch (e) { toast(e.message); }
+}
+async function copyEmbed() {
+  try {
+    const r = await api('/api/recommendations/embed', { method: 'POST', body: '{}' });
+    await navigator.clipboard.writeText(r.html).catch(() => {});
+    toast(`Embed snippet with ${r.count} partners copied to clipboard`);
+  } catch (e) { toast(e.message); }
+}
+async function createSponsorship() {
+  try {
+    await api('/api/sponsorships', { method: 'POST', body: JSON.stringify({
+      sponsor_name: $('#sp-name').value, price_cents: +$('#sp-price').value || 0,
+      ad_copy: $('#sp-copy').value }) });
+    toast('Slot listed'); loadGrow();
+  } catch (e) { toast(e.message); }
+}
+
+/* ---------- analytics ---------- */
+async function loadAnalytics() {
+  const a = await api('/api/analytics/overview?days=30');
+  $('#analytics-cards').innerHTML = [
+    ['New contacts (30d)', Object.values(a.audience.growth_by_day).reduce((x, y) => x + y, 0)],
+    ['Open rate', (a.engagement.open_rate * 100).toFixed(1) + '%'],
+    ['Click rate', (a.engagement.click_rate * 100).toFixed(1) + '%'],
+    ['Revenue 30d', money(a.revenue.total_cents)],
+    ['View→signup', (a.funnel.view_to_signup_rate * 100).toFixed(1) + '%'],
+    ['Signup→purchase', (a.funnel.signup_to_purchase_rate * 100).toFixed(1) + '%']]
+    .map(([l, v]) => `<div class="card"><div class="value">${v}</div><div class="label">${l}</div></div>`).join('');
+  $('#funnel-table').innerHTML = '<tr><th>Stage</th><th>Count</th></tr>' + [
+    ['Page views', a.funnel.page_views], ['Form signups', a.funnel.form_signups],
+    ['Purchases', a.funnel.purchases], ['Bookings', a.funnel.bookings]]
+    .map(([l, v]) => `<tr><td>${l}</td><td><b>${v}</b></td></tr>`).join('');
+  $('#top-campaigns').innerHTML = '<tr><th>Campaign</th><th>Sent</th><th>Opens</th><th>Clicks</th></tr>' +
+    (a.engagement.top_campaigns.map(c => `<tr><td>${esc(c.name)}</td><td>${c.sent}</td><td>${c.opens}</td><td>${c.clicks}</td></tr>`).join('')
+    || '<tr><td colspan="4" class="muted">No data yet.</td></tr>');
+  $('#source-table').innerHTML = '<tr><th>Source</th><th>Contacts</th></tr>' +
+    (a.audience.top_signup_sources.map(s => `<tr><td>${esc(s.source)}</td><td>${s.c}</td></tr>`).join('')
+    || '<tr><td colspan="2" class="muted">No data yet.</td></tr>');
+}
+async function loadCreator() {
+  const c = await api('/api/analytics/creator');
+  $('#creator-json').textContent = JSON.stringify(c, null, 2);
+}
+
+/* ---------- integrations ---------- */
+async function loadIntegrations() {
+  const hooks = await api('/api/integrations/webhooks');
+  $('#webhook-table').innerHTML = '<tr><th>Name</th><th>URL</th><th>Events</th><th></th></tr>' +
+    (hooks.map(h => `<tr><td>${esc(h.name)}</td><td class="muted">${esc(h.url)}</td>
+      <td class="muted">${esc(h.events.join(', ') || 'all')}</td>
+      <td><button class="btn" onclick="testWebhook('${h.id}')">Test</button>
+      <button class="btn danger" onclick="delItem('/api/integrations/webhooks/${h.id}')">Delete</button></td></tr>`).join('')
+    || '<tr><td colspan="4" class="muted">No webhooks yet.</td></tr>');
+  const dir = await api('/api/integrations/directory');
+  $('#integration-dir').textContent = JSON.stringify(dir, null, 2);
+}
+async function createWebhook() {
+  try {
+    const events = $('#wh-events').value.split(',').map(s => s.trim()).filter(Boolean);
+    await api('/api/integrations/webhooks', { method: 'POST', body: JSON.stringify({
+      name: $('#wh-name').value, url: $('#wh-url').value, events }) });
+    toast('Webhook registered'); loadIntegrations();
+  } catch (e) { toast(e.message); }
+}
+async function testWebhook(id) {
+  try { const r = await api(`/api/integrations/webhooks/${id}/test`, { method: 'POST', body: '{}' }); toast(`Delivered to ${r.delivered_to} endpoint(s)`); }
+  catch (e) { toast(e.message); }
+}
+
+/* ---------- Mailchimp import ---------- */
+async function runImport() {
+  const apiKey = $('#mc-key').value.trim();
+  if (!apiKey) { toast('Enter your Mailchimp API key'); return; }
+  const result = $('#import-result');
+  result.classList.remove('hidden');
+  result.textContent = 'Importing... (can take a while for large accounts)';
+  try {
+    const report = await api('/api/import/mailchimp', { method: 'POST',
+      body: JSON.stringify({ api_key: apiKey, with_activity: $('#mc-activity').checked }) });
+    result.textContent = JSON.stringify(report, null, 2);
+    toast('Import complete');
+  } catch (e) { result.textContent = 'Import failed:\n' + e.message; }
+}
+
+/* ---------- AI chat ---------- */
+let chatHistory = [];
+async function sendChat() {
+  const input = $('#chat-input');
+  const message = input.value.trim();
+  if (!message) return;
+  input.value = '';
+  const log = $('#chat-log');
+  log.innerHTML += `<div class="msg"><span class="who">you</span>${esc(message)}</div>`;
+  log.scrollTop = log.scrollHeight;
+  $('#chat-input').disabled = true;
+  try {
+    const r = await api('/api/agent/chat', { method: 'POST',
+      body: JSON.stringify({ message, history: chatHistory }) });
+    log.innerHTML += `<div class="msg"><span class="who">agent ${r.ai_powered ? '· ai' : '· data'}</span>${esc(r.reply)}</div>`;
+    chatHistory.push({ role: 'user', content: message }, { role: 'assistant', content: r.reply });
+  } catch (e) {
+    log.innerHTML += `<div class="msg"><span class="who">agent</span><i>${esc(e.message)}</i></div>`;
+  }
+  $('#chat-input').disabled = false;
+  log.scrollTop = log.scrollHeight;
+}
+
+loadDashboard();
+</script>
+</body>
+</html>

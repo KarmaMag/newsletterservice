@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Unsubscribe</title>
+<style>
+  body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:#f6f7fb;
+         display:grid; place-items:center; min-height:100vh; margin:0; }
+  .box { background:#fff; border:1px solid #e3e6ef; border-radius:14px; padding:36px; max-width:420px; text-align:center; }
+  h2 { margin-top:0; } .muted { color:#68718a; font-size:14px; }
+</style>
+</head>
+<body>
+<div class="box">
+  <h2>Unsubscribe</h2>
+  <div id="body" class="muted">Working...</div>
+</div>
+<script>
+const email = new URLSearchParams(location.search).get('email');
+if (!email) { document.getElementById('body').textContent = 'Missing email parameter.'; }
+else {
+  fetch('/api/unsubscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }) })
+    .then(r => { if (!r.ok) throw new Error(); })
+    .then(() => document.getElementById('body').innerHTML =
+      `You have been unsubscribed. <br><br><b>${email}</b> will no longer receive emails.`)
+    .catch(() => document.getElementById('body').textContent = 'Could not unsubscribe this address.');
+}
+</script>
+</body>
+</html>
